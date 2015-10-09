@@ -12,11 +12,6 @@
 #include <google/protobuf/dynamic_message.h>   // For parsing from stream
 #include <google/protobuf/io/zero_copy_stream_impl.h> // For io wrapper class
 
-
-#define DISALLOW_COPY_AND_ASSIGN(X) \
-  void operator=( const X& ); \
-  X(const X&)
-
 #define UNREACHABLE() assert(!"Unreachable")
 
 namespace {
