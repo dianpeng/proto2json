@@ -12,6 +12,11 @@
 #include <google/protobuf/dynamic_message.h>   // For parsing from stream
 #include <google/protobuf/io/zero_copy_stream_impl.h> // For io wrapper class
 
+
+#define DISALLOW_COPY_AND_ASSIGN(X) \
+  void operator=( const X& ); \
+  X(const X&)
+
 #define UNREACHABLE() assert(!"Unreachable")
 
 namespace {
@@ -323,9 +328,22 @@ public:
 
 class single_file_source_tree : public compiler::SourceTree {
 public:
+  single_file_source_tree( const std::string& root_file ):
+    compiler::SourceTree(),
+    m_path_prefix(),
+    m_stream_list() {
+      build_path_prefix(root_file);
+    }
+
   io::ZeroCopyInputStream* Open( const string& filename ) {
     std::ifstream* file = new std::ifstream();
-    file->open( filename.c_str() , std::ios_base::in );
+    std::string p;
+    if( m_path_prefix.empty() ) {
+      p = filename;
+    } else {
+      p = m_path_prefix + "/" + filename;
+    }
+    file->open( p.c_str() , std::ios_base::in );
     if( !file ) {
       delete file;
       return NULL;
@@ -342,9 +360,28 @@ public:
   }
 
 private:
+  void build_path_prefix( const std::string& root_file );
+  std::string m_path_prefix;
   std::vector<std::ifstream*> m_stream_list;
 };
 
+
+void single_file_source_tree::build_path_prefix( const std::string& root_file ) {
+  std::size_t npos = root_file.find_last_of("/");
+  if( npos != std::string::npos ) {
+    m_path_prefix = root_file.substr(0,npos);
+  }
+}
+
+
+void get_filename( const std::string& fn_with_path , std::string* filename ) {
+  std::size_t ipos = fn_with_path.find_last_of("/");
+  if( ipos == std::string::npos ) {
+    filename->assign(fn_with_path);
+  } else {
+    filename->assign(fn_with_path.substr(ipos+1,fn_with_path.size()-ipos-1));
+  }
+}
 } // namespace
 
 
@@ -353,13 +390,15 @@ int main( int argc, char* argv[] ) {
   if( !parse_command(argc,argv,&opt) )
     return -1;
 
-  single_file_source_tree source_tree;
+  single_file_source_tree source_tree( opt.proto_path );
   single_file_error_collector err_coll;
+  std::string filename;
+  get_filename(opt.proto_path,&filename);
 
   // Now read in the proto schema file
   compiler::Importer importer( &source_tree , &err_coll );
 
-  if( importer.Import(opt.proto_path) == NULL ) {
+  if( importer.Import(filename) == NULL ) {
     return -1;
   }
   const DescriptorPool* pool = importer.pool();
