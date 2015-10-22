@@ -12,6 +12,8 @@
 #include <google/protobuf/dynamic_message.h>   // For parsing from stream
 #include <google/protobuf/io/zero_copy_stream_impl.h> // For io wrapper class
 
+#include "base64.h" // For base64 encoding
+
 
 #define DISALLOW_COPY_AND_ASSIGN(X) \
   void operator=( const X& ); \
@@ -125,6 +127,12 @@ void message_to_json::convert_atomic_field( const Message* message , const Field
     } \
   } while(0)
 
+#define BASE64_OUTPUT(O,V) \
+  do { \
+    std::string output; \
+    util::Base64Encode(V.c_str(),V.size(),&output); \
+    O << "\"" << output << "\""; \
+  } while(0)
 
   switch( field.cpp_type() ) {
     case FieldDescriptor::CPPTYPE_BOOL:
@@ -142,7 +150,11 @@ void message_to_json::convert_atomic_field( const Message* message , const Field
     case FieldDescriptor::CPPTYPE_UINT64:
       DO_(UInt64,uint64_t,VALUE_OUTPUT);
     case FieldDescriptor::CPPTYPE_STRING:
-      DO_(String,std::string,VALUE_OUTPUT);
+      if( field.type() == FieldDescriptor::TYPE_STRING ) {
+        DO_(String,std::string,VALUE_OUTPUT);
+      } else {
+        DO_(String,std::string,BASE64_OUTPUT);
+      }
     default:
       UNREACHABLE();
       return;
